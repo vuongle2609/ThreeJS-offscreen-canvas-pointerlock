@@ -1,72 +1,60 @@
 import "./style.css";
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
-class Three {
-  renderer: THREE.WebGLRenderer;
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-  control: OrbitControls;
+import Worker from "./worker?worker";
 
-  constructor() {
-    this.initialize();
-  }
+const canvas = document.querySelector<HTMLCanvasElement>("canvas");
 
-  initialize() {
-    this.renderer = new THREE.WebGLRenderer();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
+if (canvas) {
+  const offscreen = canvas.transferControlToOffscreen();
 
-    document.body.appendChild(this.renderer.domElement);
+  const worker = new Worker();
 
-    window.addEventListener(
-      "resize",
-      () => {
-        this.onWindowResize();
-      },
-      false
-    );
+  worker.postMessage(
+    {
+      type: "init",
+      drawingSurface: offscreen,
+      width: canvas.clientWidth,
+      height: canvas.clientHeight,
+      pixelRatio: window.devicePixelRatio,
+    },
+    [offscreen]
+  );
 
-    this.camera = new THREE.PerspectiveCamera(
-      20,
-      window.innerWidth / window.innerHeight,
-      1.0,
-      500
-    );
+  window.addEventListener(
+    "resize",
+    () => {
+      worker.postMessage({
+        type: "resize",
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    },
+    false
+  );
 
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#DEF5E5");
-
-    this.control = new OrbitControls(this.camera, this.renderer.domElement);
-
-    const cube = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 4, 4),
-      new THREE.MeshBasicMaterial({ color: 0x0d4c92 })
-    );
-    cube.castShadow = true;
-    cube.receiveShadow = true;
-
-    this.scene.add(cube);
-
-    this.camera.position.set(20, 20, 20);
-    this.camera.lookAt(cube.position);
-
-    this.RAF(0);
-  }
-
-  onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-
-  RAF(t: number) {
-    requestAnimationFrame((t) => {
-      this.RAF(t);
+  const a = (e: MouseEvent) => {
+    worker.postMessage({
+      type: "updateCamera",
+      x: e.movementX,
+      y: e.movementY,
     });
+  };
 
-    this.renderer.render(this.scene, this.camera);
+  function lockChangeAlert() {
+    if (document.pointerLockElement === canvas) {
+      console.log("The pointer lock status is now locked");
+      document.addEventListener("mousemove", a, false);
+    } else {
+      console.log("The pointer lock status is now unlocked");
+      document.removeEventListener("mousemove", a, false);
+    }
   }
-}
 
-new Three();
+  document.addEventListener("pointerlockchange", lockChangeAlert, false);
+
+  canvas.addEventListener("click", async () => {
+    if (!document.pointerLockElement) {
+      await canvas.requestPointerLock();
+    }
+  });
+}
