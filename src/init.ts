@@ -56,7 +56,7 @@ class Three {
   }
 
   updateCameraRotation(x: number, y: number) {
-    const sensitivity = 0.002;
+    const sensitivity = 0.0002;
     const rotationLimit = Math.PI / 2.5;
 
     const movementX = x * sensitivity;
